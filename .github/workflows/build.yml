@@ -1,0 +1,50 @@
+name: Build and Release Compose Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*'  # Запускается при пуше тэга, например: v1.0.0
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+
+      - name: Grant execute permission for Gradle wrapper (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: chmod +x ./gradlew
+
+      - name: Build native distribution
+        run: ./gradlew createDistributable
+
+      - name: Find artifacts
+        id: find-artifacts
+        run: |
+          echo "artifact_path=$(find build/compose/binaries -type f | grep -E '\.(jar|exe|deb|dmg)$' | tr '\n' ' ')" >> $GITHUB_OUTPUT
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: PortMapper ${{ github.ref_name }}
+          body: |
+            Auto-generated release for PortMapper version ${{ github.ref_name }}
+          files: ${{ steps.find-artifacts.outputs.artifact_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
