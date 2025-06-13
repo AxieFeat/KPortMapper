@@ -10,7 +10,7 @@
 
 ## Requirements
 
-- Java 8 or newer (Only for building from sources)
+- Java 21 or newer (Only for building from sources)
 - A router with UPnP support enabled
 
 ## Based on

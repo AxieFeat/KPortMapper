@@ -3,7 +3,7 @@ name: Build and Release Compose Desktop App
 on:
   push:
     tags:
-      - 'v*'  # Запускается при пуше тэга, например: v1.0.0
+      - 'v*'
 
 jobs:
   build:
@@ -12,6 +12,16 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_pattern: '*.deb'
+            search_path: 'build/compose/binaries/main/deb'
+          - os: windows-latest
+            artifact_pattern: '*.msi'
+            search_path: 'build/compose/binaries/main/msi'
+          - os: macos-latest
+            artifact_pattern: '*.dmg'
+            search_path: 'build/compose/binaries/main/dmg'
 
     steps:
       - name: Checkout code
@@ -21,7 +31,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
 
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
@@ -36,7 +46,13 @@ jobs:
       - name: Find artifacts
         id: find-artifacts
         run: |
-          echo "artifact_path=$(find build/compose/binaries -type f | grep -E '\.(jar|exe|deb|dmg)$' | tr '\n' ' ')" >> $GITHUB_OUTPUT
+          artifact_path=$(find "${{ matrix.search_path }}" -type f -name "${{ matrix.artifact_pattern }}" | head -n 1)
+          if [ -z "$artifact_path" ]; then
+            echo "::error::No artifact found for pattern ${{ matrix.artifact_pattern }} in ${{ matrix.search_path }}"
+            exit 1
+          fi
+          echo "artifact_path=$artifact_path" >> $GITHUB_OUTPUT
+          echo "artifact_name=$(basename "$artifact_path")" >> $GITHUB_OUTPUT
 
       - name: Upload Release
         uses: softprops/action-gh-release@v1
@@ -45,6 +61,7 @@ jobs:
           name: PortMapper ${{ github.ref_name }}
           body: |
             Auto-generated release for PortMapper version ${{ github.ref_name }}
+            Built for ${{ matrix.os }}
           files: ${{ steps.find-artifacts.outputs.artifact_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
