@@ -16,12 +16,15 @@ jobs:
           - os: ubuntu-latest
             artifact_pattern: '*.deb'
             search_path: 'build/compose/binaries/main/deb'
+            gradle_task: 'packageDeb'
           - os: windows-latest
             artifact_pattern: '*.msi'
             search_path: 'build/compose/binaries/main/msi'
+            gradle_task: 'packageMsi'
           - os: macos-latest
             artifact_pattern: '*.dmg'
             search_path: 'build/compose/binaries/main/dmg'
+            gradle_task: 'packageDmg'
 
     steps:
       - name: Checkout code
@@ -40,15 +43,22 @@ jobs:
         if: runner.os != 'Windows'
         run: chmod +x ./gradlew
 
-      - name: Build native distribution
-        run: ./gradlew createDistributable
+      - name: Build specific package
+        run: ./gradlew ${{ matrix.gradle_task }}
 
       - name: Find artifacts
         id: find-artifacts
         run: |
+          if [ ! -d "${{ matrix.search_path }}" ]; then
+            echo "::error::Directory ${{ matrix.search_path }} does not exist"
+            ls -R build/compose/binaries || true
+            exit 1
+          fi
+          
           artifact_path=$(find "${{ matrix.search_path }}" -type f -name "${{ matrix.artifact_pattern }}" | head -n 1)
           if [ -z "$artifact_path" ]; then
             echo "::error::No artifact found for pattern ${{ matrix.artifact_pattern }} in ${{ matrix.search_path }}"
+            ls -la "${{ matrix.search_path }}" || true
             exit 1
           fi
           echo "artifact_path=$artifact_path" >> $GITHUB_OUTPUT
