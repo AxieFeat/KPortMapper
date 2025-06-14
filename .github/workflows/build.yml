@@ -17,14 +17,17 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         include:
           - os: ubuntu-latest
-            artifact_pattern: '*.deb'
-            artifact_name: 'PortMapper-Linux.deb'
+            gradle_task: packageDeb
+            artifact_ext: .deb
+            artifact_name: PortMapper-Linux.deb
           - os: windows-latest
-            artifact_pattern: '*.msi'
-            artifact_name: 'PortMapper-Windows.msi'
+            gradle_task: packageMsi
+            artifact_ext: .msi
+            artifact_name: PortMapper-Windows.msi
           - os: macos-latest
-            artifact_pattern: '*.app'
-            artifact_name: 'PortMapper-macOS.zip'
+            gradle_task: packageDmg
+            artifact_ext: .dmg
+            artifact_name: PortMapper-macOS.dmg
 
     steps:
       - name: Checkout code
@@ -43,35 +46,22 @@ jobs:
         if: runner.os != 'Windows'
         run: chmod +x ./gradlew
 
-      - name: Build package
-        run: ./gradlew createDistributable
+      - name: Build installer
+        run: ./gradlew ${{ matrix.gradle_task }}
 
-      - name: Debug output files
-        run: find build/compose -type f || true
-
-      - name: Prepare artifact
-        id: prepare-artifact
+      - name: Locate artifact
+        id: artifact
         run: |
-          if [ "${{ runner.os }}" == "macOS" ]; then
-            cd build/compose/binaries/main/app
-            zip -r "${{ matrix.artifact_name }}" *.app
-            echo "artifact_path=build/compose/binaries/main/app/${{ matrix.artifact_name }}" >> $GITHUB_OUTPUT
-          else
-            artifact_path=$(find build/compose/binaries -type f -name "${{ matrix.artifact_pattern }}" | head -n 1)
-            if [ -z "$artifact_path" ]; then
-              echo "Error: Artifact not found for pattern '${{ matrix.artifact_pattern }}'"
-              exit 1
-            fi
-            cp "$artifact_path" "${{ matrix.artifact_name }}"
-            echo "artifact_path=${{ matrix.artifact_name }}" >> $GITHUB_OUTPUT
-          fi
+          artifact_path=$(find build/compose/binaries -type f -name "*${{ matrix.artifact_ext }}" | head -n 1)
+          cp "$artifact_path" "${{ matrix.artifact_name }}"
+          echo "artifact_path=${{ matrix.artifact_name }}" >> $GITHUB_OUTPUT
           echo "artifact_name=${{ matrix.artifact_name }}" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ steps.prepare-artifact.outputs.artifact_path }}
+          name: ${{ steps.artifact.outputs.artifact_name }}
+          path: ${{ steps.artifact.outputs.artifact_path }}
 
   release:
     name: Create Release
@@ -86,7 +76,7 @@ jobs:
       - name: List downloaded artifacts
         run: ls -R artifacts
 
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
@@ -97,6 +87,6 @@ jobs:
           files: |
             artifacts/PortMapper-Windows.msi
             artifacts/PortMapper-Linux.deb
-            artifacts/PortMapper-macOS.zip
+            artifacts/PortMapper-macOS.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
