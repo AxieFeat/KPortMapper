@@ -51,6 +51,7 @@ jobs:
 
       - name: Locate artifact
         id: artifact
+        shell: bash
         run: |
           artifact_path=$(find build/compose/binaries -type f -name "*${{ matrix.artifact_ext }}" | head -n 1)
           cp "$artifact_path" "${{ matrix.artifact_name }}"
