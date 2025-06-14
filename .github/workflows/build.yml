@@ -46,15 +46,22 @@ jobs:
       - name: Build package
         run: ./gradlew createDistributable
 
+      - name: Debug output files
+        run: find build/compose -type f || true
+
       - name: Prepare artifact
         id: prepare-artifact
         run: |
           if [ "${{ runner.os }}" == "macOS" ]; then
             cd build/compose/binaries/main/app
-            zip -r ${{ matrix.artifact_name }} *.app
+            zip -r "${{ matrix.artifact_name }}" *.app
             echo "artifact_path=build/compose/binaries/main/app/${{ matrix.artifact_name }}" >> $GITHUB_OUTPUT
           else
             artifact_path=$(find build/compose/binaries -type f -name "${{ matrix.artifact_pattern }}" | head -n 1)
+            if [ -z "$artifact_path" ]; then
+              echo "Error: Artifact not found for pattern '${{ matrix.artifact_pattern }}'"
+              exit 1
+            fi
             cp "$artifact_path" "${{ matrix.artifact_name }}"
             echo "artifact_path=${{ matrix.artifact_name }}" >> $GITHUB_OUTPUT
           fi
