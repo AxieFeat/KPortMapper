@@ -12,10 +12,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.dosse.upnp.UPnP
+import xyz.axie.portmapper.i18n.I18n
+import xyz.axie.portmapper.i18n.Language
 
 @Composable
 @Preview
 fun App() {
+    var language by remember {
+        mutableStateOf(Language.systemLanguage())
+    }
+
+    val i18n = remember(language) {
+        I18n(language)
+    }
+
     val isAvailable = remember { UPnP.isUPnPAvailable() }
 
     var portText by remember { mutableStateOf("") }
@@ -54,14 +64,57 @@ fun App() {
             modifier = Modifier.padding(16.dp).fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            var languageMenuExpanded by remember {
+                mutableStateOf(false)
+            }
+
+            Box {
+                Button(
+                    onClick = {
+                        languageMenuExpanded = true
+                    }
+                ) {
+                    Text(
+                        when (language) {
+                            Language.ENGLISH -> i18n["language.english"]
+                            Language.RUSSIAN -> i18n["language.russian"]
+                        }
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = languageMenuExpanded,
+                    onDismissRequest = {
+                        languageMenuExpanded = false
+                    }
+                ) {
+                    DropdownMenuItem(
+                        onClick = {
+                            language = Language.ENGLISH
+                            languageMenuExpanded = false
+                        }
+                    ) {
+                        Text(i18n["language.english"])
+                    }
+
+                    DropdownMenuItem(
+                        onClick = {
+                            language = Language.RUSSIAN
+                            languageMenuExpanded = false
+                        }
+                    ) {
+                        Text(i18n["language.russian"])
+                    }
+                }
+            }
+
             if (!isAvailable) {
                 Text(
-                    "UPnP is not available on this network.",
+                    i18n["upnp.unavailable"],
                     color = MaterialTheme.colors.error,
                     style = MaterialTheme.typography.h6
                 )
             }
-
             OutlinedTextField(
                 value = portText,
                 onValueChange = { newValue ->
@@ -69,13 +122,15 @@ fun App() {
                     val split = newValue.split(", ").filter { it.isNotEmpty() }
 
                     val parsedPorts = split.mapNotNull { it.toIntOrNull() }
-                    isValidPorts = split.size == parsedPorts.size && parsedPorts.all { it in 0..65535 }
+                    isValidPorts =
+                        split.size == parsedPorts.size &&
+                                parsedPorts.all { it in 0..65535 }
 
                     if (isValidPorts) {
                         ports = parsedPorts.toSet()
                     }
                 },
-                label = { Text("Port (0–65535). Separate with ', '") },
+                label = { Text(i18n["port.label"]) },
                 isError = !isValidPorts,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = isAvailable
@@ -83,7 +138,7 @@ fun App() {
 
             if (!isValidPorts && isAvailable) {
                 Text(
-                    "Cannot parse ports",
+                    i18n["port.invalid"],
                     color = MaterialTheme.colors.error,
                     style = MaterialTheme.typography.caption
                 )
@@ -98,14 +153,16 @@ fun App() {
                     onClick = { openPorts(Port.TCP, *ports.toIntArray()) },
                     enabled = isAvailable && isValidPorts && ports.isNotEmpty()
                 ) {
-                    Text("Open TCP")
+                    Text(i18n["port.open_tcp"])
                 }
+
                 Spacer(modifier = Modifier.width(8.dp))
+
                 Button(
                     onClick = { openPorts(Port.UDP, *ports.toIntArray()) },
                     enabled = isAvailable && isValidPorts && ports.isNotEmpty()
                 ) {
-                    Text("Open UDP")
+                    Text(i18n["port.open_udp"])
                 }
             }
 
@@ -118,14 +175,16 @@ fun App() {
                     onClick = { closePorts(Port.TCP, *ports.toIntArray()) },
                     enabled = isAvailable && isValidPorts && ports.isNotEmpty()
                 ) {
-                    Text("Close TCP")
+                    Text(i18n["port.close_tcp"])
                 }
+
                 Spacer(modifier = Modifier.width(8.dp))
+
                 Button(
                     onClick = { closePorts(Port.UDP, *ports.toIntArray()) },
                     enabled = isAvailable && isValidPorts && ports.isNotEmpty()
                 ) {
-                    Text("Close UDP")
+                    Text(i18n["port.close_udp"])
                 }
             }
 
@@ -137,35 +196,50 @@ fun App() {
                     onClick = { showPortManager = true },
                     enabled = isAvailable
                 ) {
-                    Text("Manage Ports")
+                    Text(i18n["ports.manage"])
                 }
             }
 
             if (showPortManager && isAvailable) {
                 Window(
                     onCloseRequest = { showPortManager = false },
-                    title = "Port Manager"
+                    title = i18n["ports.manager_title"]
                 ) {
                     MaterialTheme {
                         Column(
-                            modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .verticalScroll(rememberScrollState())
                         ) {
-                            Text("Opened Ports:", style = MaterialTheme.typography.h6)
+                            Text(
+                                i18n["ports.opened"],
+                                style = MaterialTheme.typography.h6
+                            )
+
                             Spacer(Modifier.height(8.dp))
+
                             if (openedPorts.isEmpty()) {
-                                Text("No ports are currently open.")
+                                Text(i18n["ports.empty"])
                             } else {
                                 openedPorts.forEach { (port, type) ->
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text("$port - ${type.name}")
-                                        IconButton(onClick = {
-                                            closePorts(type, port)
-                                        }) {
-                                            Text("×", style = MaterialTheme.typography.h6)
+
+                                        IconButton(
+                                            onClick = {
+                                                closePorts(type, port)
+                                            }
+                                        ) {
+                                            Text(
+                                                "×",
+                                                style = MaterialTheme.typography.h6
+                                            )
                                         }
                                     }
                                 }
@@ -180,7 +254,10 @@ fun App() {
 
 
 fun main() = application {
-    Window(onCloseRequest = ::exitApplication) {
+    Window(
+        onCloseRequest = ::exitApplication,
+        title = "KPortMapper",
+    ) {
         App()
     }
 }
